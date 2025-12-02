@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+sqlmodel
+pydantic
+ollama
+python-multipart  # Required for file uploads
+pypdf             # To read your PDF resume

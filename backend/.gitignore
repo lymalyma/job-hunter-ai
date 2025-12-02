@@ -1,0 +1,20 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Ignore the virtual environment
+.venv/
+
+# Ignore .env files (NEVER commit API keys!)
+.env
+
+# Ignore SQLite databases
+*.db
+*.sqlite3
