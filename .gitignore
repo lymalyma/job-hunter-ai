@@ -7,14 +7,11 @@ wheels/
 *.egg-info
 
 # Virtual environments
-.venv
-
-# Ignore the virtual environment
 .venv/
 
-# Ignore .env files (NEVER commit API keys!)
+# Environment variables
 .env
 
-# Ignore SQLite databases
+# SQLite databases
 *.db
 *.sqlite3
