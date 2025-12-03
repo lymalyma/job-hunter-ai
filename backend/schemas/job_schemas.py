@@ -9,3 +9,10 @@ class JobParsedData(BaseModel):
     job_summary: str
     responsibilities: List[str]
     required_skills: List[str]
+
+class JobMatchOutput(BaseModel): 
+    match_score: int
+    missing_skills: List[str]
+    analysis_feedback: str 
+
+    

@@ -2,7 +2,7 @@ from typing import Optional, List
 from datetime import datetime
 
 from sqlmodel import SQLModel, Field
-from pydantic import BaseModel
+
 
 class MasterResume(SQLModel, table=True): 
     id: Optional[int] = Field(default=None, primary_key=True)
