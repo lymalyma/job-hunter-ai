@@ -1,7 +1,7 @@
 import json
 import re 
 import ollama
-from backend.schemas.job_schemas import JobParsedData, JobMatchOutput
+from backend.schemas.job_schemas import JobParsedData, JobMatchOutput, TailoredResumeContent
 from backend.schemas.resume_schemas import ResumeParsedData
 
 
@@ -37,47 +37,45 @@ async def extract_job_data(raw_text: str) -> JobParsedData:
     return JobParsedData.parse_raw(response['message']['content'])
 
 
-# backend/services/llm_service.py
-
-# ... keep imports ...
-
 async def analyze_match(resume_text: str, job_data: dict) -> JobMatchOutput:
     """
-    Compares the Master Resume against the Parsed Job Data.
+    Acts as a Career Coach to analyze fit and provide strategy.
     """
-    print("🤖 Service: Comparing Resume vs Job...")
+    print("🤖 Service: Analyzing strategic fit...")
 
     prompt = f"""
-    You are a technical recruiter. Compare the Candidate's Resume against the Job Description.
+    You are an honest Career Coach. Analyze if the candidate should apply for this job.
+    
+    JOB TITLE: {job_data.get('position_title')}
+    JOB SUMMARY: {job_data.get('job_summary')}
+    REQUIRED SKILLS: {job_data.get('required_skills')}
+    
+    CANDIDATE RESUME:
+    {resume_text}
     
     TASK:
-    1. MATCH SCORE: 0-100 based on keyword overlap.
-    2. MISSING SKILLS: Identify important technical skills in the Job that are missing from the Resume.
-    3. FEEDBACK: Write a specific 1-sentence explanation of the score.
+    1. Score the match (0-100).
+    2. Give a verdict: "Strong Match", "Good Match", "Reach / Stretch", or "Not Recommended".
+    3. Identify MISSING critical skills (dealbreakers).
+    4. Provide STRATEGIC ADVICE:
+       - Look for "Transferable Skills". If the job asks for a specific tool (e.g., OCI) but the candidate has the equivalent (e.g., AWS), explain EXACTLY how they should frame their experience to sound relevant.
+       - If the candidate should NOT apply, explain why.
     
-    CRITICAL: DO NOT COPY THE EXAMPLE TEXT. WRITE ORIGINAL FEEDBACK.
-
     ### REQUIRED JSON STRUCTURE ###
     {{
-        "match_score": <INTEGER_0_TO_100>,
-        "missing_skills": ["<MISSING_SKILL_1>", "<MISSING_SKILL_2>"],
-        "analysis_feedback": "<WRITE_YOUR_OWN_FEEDBACK_HERE>"
+        "match_score": 0,
+        "recommendation": "Strong Match", 
+        "missing_critical_skills": ["Skill1", "Skill2"],
+        "resume_gaps": ["Missing X", "Missing Y"],
+        "transferable_skills_advice": "Your AWS experience is your strongest asset. Frame your 'Terraform for AWS' bullet as 'Infrastructure as Code for Cloud Platforms'."
     }}
-
-    --- JOB DETAILS ---
-    Title: {job_data.get('position_title')}
-    Skills Needed: {job_data.get('required_skills')}
-    Summary: {job_data.get('job_summary')}
-
-    --- CANDIDATE RESUME ---
-    {resume_text}
     """
 
     response = ollama.chat(model='llama3.2:latest', messages=[
         {'role': 'user', 'content': prompt}
     ], format='json')
 
-    return JobMatchOutput.parse_raw(response['message']['content'])
+    return JobMatchOutput.model_validate_json(response['message']['content'])
 
 
 def clean_json_text(text: str) -> str:
@@ -151,3 +149,51 @@ async def parse_resume_text(resume_text: str) -> ResumeParsedData:
     print(f"DEBUG CLEANED JSON: {cleaned_content[:200]}...") 
 
     return ResumeParsedData.model_validate_json(cleaned_content)
+
+
+# backend/services/llm_service.py
+
+# ... imports ...
+
+async def tailor_resume(resume_json: dict, job_data: dict) -> TailoredResumeContent:
+    """
+    Rewrites resume sections to emphasize TRANSFERABLE skills without fabricating experience.
+    """
+    print("🤖 Service: Tailoring resume (Truthfully)...")
+
+    prompt = f"""
+    You are an expert career coach. Tailor the candidate's resume for a specific job.
+    
+    CRITICAL RULES (DO NOT BREAK):
+    1. NO FABRICATION: Do not add tools, companies, or skills the candidate does not have.
+    2. NO SWAPPING: Do not change specific tool names (e.g., do NOT change 'AWS' to 'OCI').
+    3. TRANSFERABLE SKILLS: If the candidate used AWS but the job needs OCI, rewrite the bullet to emphasize the *concept* (e.g., "Managed Public Cloud Infrastructure" or "Optimized Cloud Resources") rather than the specific tool.
+    4. HIGHLIGHT RELEVANCE: Bring unrelated bullets closer to the job's domain (e.g., if job needs "Optimization", rephrase "Fixed bugs" to "Optimized system performance").
+    
+    JOB TITLE: {job_data.get('position_title')}
+    REQUIRED SKILLS: {job_data.get('required_skills')}
+    
+    CANDIDATE EXPERIENCE (JSON):
+    {resume_json.get('experience')}
+    
+    TASK:
+    1. Write a Professional Summary that bridges the candidate's actual experience to the target role.
+    2. Rewrite bullets for the 2 most relevant jobs. Focus on *actions* and *results* that apply to the new role.
+    
+    ### REQUIRED JSON STRUCTURE ###
+    {{
+        "new_summary": "<NEW_SUMMARY>",
+        "rewritten_experience": {{
+            "JPMorgan Chase": ["<BULLET_1>", "<BULLET_2>"],
+            "Intuit": ["<BULLET_1>"]
+        }},
+        "match_reasoning": "Explain how you highlighted transferable skills."
+    }}
+    """
+
+    response = ollama.chat(model='llama3.2:latest', messages=[
+        {'role': 'user', 'content': prompt}
+    ], format='json')
+
+    content = response['message']['content']
+    return TailoredResumeContent.parse_raw(content)
