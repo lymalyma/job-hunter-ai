@@ -153,7 +153,7 @@ async def parse_resume_text(resume_text: str) -> ResumeParsedData:
 
 # backend/services/llm_service.py
 
-# ... imports ...
+# ... keep imports and clean_json_text function ...
 
 async def tailor_resume(resume_json: dict, job_data: dict) -> TailoredResumeContent:
     """
@@ -164,11 +164,10 @@ async def tailor_resume(resume_json: dict, job_data: dict) -> TailoredResumeCont
     prompt = f"""
     You are an expert career coach. Tailor the candidate's resume for a specific job.
     
-    CRITICAL RULES (DO NOT BREAK):
-    1. NO FABRICATION: Do not add tools, companies, or skills the candidate does not have.
-    2. NO SWAPPING: Do not change specific tool names (e.g., do NOT change 'AWS' to 'OCI').
-    3. TRANSFERABLE SKILLS: If the candidate used AWS but the job needs OCI, rewrite the bullet to emphasize the *concept* (e.g., "Managed Public Cloud Infrastructure" or "Optimized Cloud Resources") rather than the specific tool.
-    4. HIGHLIGHT RELEVANCE: Bring unrelated bullets closer to the job's domain (e.g., if job needs "Optimization", rephrase "Fixed bugs" to "Optimized system performance").
+    CRITICAL RULES:
+    1. NO FABRICATION.
+    2. NO SWAPPING tool names.
+    3. Use TRANSFERABLE SKILLS concepts.
     
     JOB TITLE: {job_data.get('position_title')}
     REQUIRED SKILLS: {job_data.get('required_skills')}
@@ -177,8 +176,9 @@ async def tailor_resume(resume_json: dict, job_data: dict) -> TailoredResumeCont
     {resume_json.get('experience')}
     
     TASK:
-    1. Write a Professional Summary that bridges the candidate's actual experience to the target role.
-    2. Rewrite bullets for the 2 most relevant jobs. Focus on *actions* and *results* that apply to the new role.
+    1. Write a Professional Summary.
+    2. Rewrite bullets for the 2 most relevant jobs.
+    3. Explain your reasoning.
     
     ### REQUIRED JSON STRUCTURE ###
     {{
@@ -195,5 +195,12 @@ async def tailor_resume(resume_json: dict, job_data: dict) -> TailoredResumeCont
         {'role': 'user', 'content': prompt}
     ], format='json')
 
-    content = response['message']['content']
-    return TailoredResumeContent.parse_raw(content)
+    raw_content = response['message']['content']
+    
+    # FIX 1: Clean the JSON (remove ```json, fix quotes)
+    cleaned_content = clean_json_text(raw_content)
+    
+    print(f"DEBUG TAILOR OUTPUT: {cleaned_content[:200]}...")
+
+    # FIX 2: Use model_validate_json which is more robust for Pydantic v2
+    return TailoredResumeContent.model_validate_json(cleaned_content)
